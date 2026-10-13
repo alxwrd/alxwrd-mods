@@ -6,8 +6,30 @@
     "voice": {
       "type": "string",
       "title": "Piper voice",
-      "description": "Voice model name passed to piper -m",
-      "default": "en_GB-alba-medium"
+      "description": "Piper voice to speak with. It downloads on first use. More voices: /speak install <name>",
+      "default": "en_GB-alba-medium",
+      "options": [
+        "en_GB-alba-medium",
+        "en_GB-alan-medium",
+        "en_GB-aru-medium",
+        "en_GB-cori-medium",
+        "en_GB-jenny_dioco-medium",
+        "en_GB-northern_english_male-medium",
+        "en_GB-semaine-medium",
+        "en_GB-southern_english_female-low",
+        "en_GB-vctk-medium",
+        "en_US-amy-medium",
+        "en_US-arctic-medium",
+        "en_US-hfc_female-medium",
+        "en_US-hfc_male-medium",
+        "en_US-joe-medium",
+        "en_US-kristin-medium",
+        "en_US-lessac-medium",
+        "en_US-libritts_r-medium",
+        "en_US-norman-medium",
+        "en_US-ryan-high",
+        "en_US-sam-medium"
+      ]
     },
     "dataDir": {
       "type": "string",
@@ -18,7 +40,7 @@
     "port": {
       "type": "number",
       "title": "Server port",
-      "description": "Local port for the Piper HTTP server kept running for fast speech",
+      "description": "Local port for the Piper HTTP server kept running for fast speech (the default is fine unless something else uses 5123)",
       "default": 5123
     }
   },

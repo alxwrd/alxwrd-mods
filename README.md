@@ -30,7 +30,10 @@ Needs `uvx`, `curl` and `pkill`; audio playback is macOS only.
 | `/speak reload` | restart the Piper HTTP server |
 
 The footer shows `• speak` (green on, red off, with the speed when not 1x).
-Set the `dataDir` option to keep voices outside the plugin folder.
+The `voice` option is a picker of Piper voices; the chosen voice downloads on first
+use. Any other Piper voice works with `/speak install <name>`. The server uses port
+5123 unless you change the `port` option. Set `dataDir` to keep voices outside the
+plugin folder.
 
 ## Adding a mod
 

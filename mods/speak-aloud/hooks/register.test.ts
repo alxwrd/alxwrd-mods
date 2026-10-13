@@ -139,3 +139,21 @@ test('speech uses length_scale from the speed', async ($, on) => {
   await $.turn.complete(answer('Hi.'))
   expect(argvs[0]?.join(' ')).toContain('"length_scale":0.5')
 })
+
+test('session start downloads the voice when it is missing', async ($, on) => {
+  const argvs: string[][] = []
+  mock.store(on)
+  on('process.run', async (_$, e) => {
+    argvs.push((e as { argv: string[] }).argv)
+    return { value: { exitCode: 1, stdout: '', stderr: '' } } as never
+  })
+  on('http.fetch', async () => ({ value: { status: 500, ok: false, headers: {}, text: '' } }) as never)
+  on('ui.toast', async () => ({ value: undefined }) as never)
+  on('fs.exists', async () => ({ value: false }) as never)
+  on('command.register', async () => ({ value: undefined }) as never)
+  on('session.start', async () => ({ cwd: '/tmp' }) as never)
+  await $.session.start({ source: 'startup', cwd: '/tmp' } as never)
+  await new Promise(resolve => setTimeout(resolve, 0))
+  const download = argvs.find(argv => argv.includes('piper.download_voices'))
+  expect(download).toContain('en_GB-alba-medium')
+})

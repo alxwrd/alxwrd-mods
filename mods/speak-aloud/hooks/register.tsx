@@ -93,8 +93,28 @@ export const register: Register = (on, options) => {
     const dataDir = configuredDir || `${$.plugin.root}/voices`
     // another session may already be serving on this port: reuse it
     const live = await $.http.fetch(`http://127.0.0.1:${port}/info`).catch(() => undefined)
-    if (!live?.ok && !isServerStarted && (await $.fs.exists(`${dataDir}/${voice}.onnx`))) {
-      void serve(request => $.process.spawn(request), dataDir)
+    const startServer = () => {
+      if (!live?.ok && !isServerStarted) void serve(request => $.process.spawn(request), dataDir)
+    }
+    if (await $.fs.exists(`${dataDir}/${voice}.onnx`)) {
+      startServer()
+    } else {
+      // first run: fetch the chosen voice in the background, then start the server
+      $.ui.toast(`speak: downloading voice ${voice}...`)
+      void (async () => {
+        const run = await $.process
+          .run(
+            ['uvx', '--from', 'piper-tts', 'python', '-m', 'piper.download_voices', voice, '--data-dir', dataDir],
+            { timeoutMs: 600_000 },
+          )
+          .catch(() => undefined)
+        if (run?.exitCode === 0) {
+          $.ui.toast(`speak: voice ${voice} ready`)
+          startServer()
+        } else {
+          $.ui.toast(`speak: voice download failed; run /speak install`)
+        }
+      })()
     }
     return next(e)
   })
