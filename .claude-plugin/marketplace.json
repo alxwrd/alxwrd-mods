@@ -1,0 +1,16 @@
+{
+  "name": "alxwrd-mods",
+  "owner": {
+    "name": "alxwrd"
+  },
+  "plugins": [
+    {
+      "name": "speak-aloud",
+      "source": "./mods/speak-aloud",
+      "description": "Reads the first paragraph of each turn aloud with Piper TTS; toggle with /speak on|off."
+    }
+  ],
+  "metadata": {
+    "description": "Small Claude Code mods by alxwrd"
+  }
+}

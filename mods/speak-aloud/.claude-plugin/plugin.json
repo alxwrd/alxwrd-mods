@@ -1,0 +1,29 @@
+{
+  "name": "speak-aloud",
+  "version": "0.1.0",
+  "description": "Reads the first paragraph of each turn aloud with Piper TTS; toggle with /speak on|off.",
+  "userConfig": {
+    "voice": {
+      "type": "string",
+      "title": "Piper voice",
+      "description": "Voice model name passed to piper -m",
+      "default": "en_GB-alba-medium"
+    },
+    "dataDir": {
+      "type": "string",
+      "title": "Voice data directory",
+      "description": "Absolute path piper --data-dir reads voices from; empty uses <plugin>/voices",
+      "default": ""
+    },
+    "port": {
+      "type": "number",
+      "title": "Server port",
+      "description": "Local port for the Piper HTTP server kept running for fast speech",
+      "default": 5123
+    }
+  },
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "alxwrd"
+  }
+}
