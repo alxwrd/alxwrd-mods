@@ -39,3 +39,14 @@ plugin folder.
 
 Create `mods/<name>/` with `.claude-plugin/plugin.json` and `hooks/`, then add an
 entry with `"source": "./mods/<name>"` to `.claude-plugin/marketplace.json`.
+
+## Licence
+
+MIT, see [LICENSE](LICENSE). The speak-aloud mod runs [Piper](https://github.com/OHF-Voice/piper1-gpl)
+(GPL-3.0) as a separate program and does not include its code. Piper voices are
+downloaded on first use and each has its own licence, so check the voice you pick.
+
+The default voice, `en_GB-alba-medium`, is trained on the
+[Alba dataset](https://datashare.ed.ac.uk/handle/10283/3270) from the University of
+Edinburgh, licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). That
+licence allows use and redistribution with attribution.
