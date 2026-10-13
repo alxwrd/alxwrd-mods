@@ -157,3 +157,58 @@ test('session start downloads the voice when it is missing', async ($, on) => {
   const download = argvs.find(argv => argv.includes('piper.download_voices'))
   expect(download).toContain('en_GB-alba-medium')
 })
+
+test('speaks the first paragraph while the reply is still streaming', async ($, on) => {
+  const events: string[] = []
+  mock.store(on)
+  on('process.run', async () => ({ value: { exitCode: 0, stdout: '', stderr: '' } }) as never)
+  on('fs.exists', async () => ({ value: true }) as never)
+  on('fs.read', async () => ({ value: { base64: 'AAAA' } }) as never)
+  on('audio.play', async () => {
+    events.push('played')
+    return { value: undefined } as never
+  })
+  on('turn.step', async function* () {
+    for (const text of ['All done', ' here.\n', '\nMore detail ', 'below.']) {
+      yield { kind: 'text', index: 0, text } as never
+      events.push(`chunk ${JSON.stringify(text)}`)
+    }
+    return { turnId: 't1', index: 0, answer: 'All done here.\n\nMore detail below.', toolUses: [], stopReason: 'end_turn', usage: null } as never
+  })
+  on('turn.complete', async () => ({ text: '' }))
+
+  const stream = $.turn.step({ turnId: 't1', index: 0, model: 'm', messageCount: 1 } as never)
+  const seen: string[] = []
+  for await (const chunk of stream) seen.push((chunk as { text: string }).text)
+  await stream.result
+  expect(seen.join('')).toBe('All done here.\n\nMore detail below.')
+  expect(events.filter(e => e === 'played')).toHaveLength(1)
+
+  // the turn already spoke from the stream, so turn.complete stays quiet
+  await $.turn.complete(answer('All done here.\n\nMore detail below.'))
+  expect(events.filter(e => e === 'played')).toHaveLength(1)
+})
+
+test('turn.complete still speaks when the stream had no blank line', async ($, on) => {
+  let plays = 0
+  mock.store(on)
+  on('process.run', async () => ({ value: { exitCode: 0, stdout: '', stderr: '' } }) as never)
+  on('fs.exists', async () => ({ value: true }) as never)
+  on('fs.read', async () => ({ value: { base64: 'AAAA' } }) as never)
+  on('audio.play', async () => {
+    plays++
+    return { value: undefined } as never
+  })
+  on('turn.step', async function* () {
+    yield { kind: 'text', index: 0, text: 'Just one line.' } as never
+    return { turnId: 't2', index: 0, answer: 'Just one line.', toolUses: [], stopReason: 'end_turn', usage: null } as never
+  })
+  on('turn.complete', async () => ({ text: '' }))
+
+  const stream = $.turn.step({ turnId: 't2', index: 0, model: 'm', messageCount: 1 } as never)
+  for await (const _chunk of stream) { /* drain */ }
+  await stream.result
+  expect(plays).toBe(0)
+  await $.turn.complete({ ...(answer('Just one line.') as object), turnId: 't2' } as never)
+  expect(plays).toBe(1)
+})

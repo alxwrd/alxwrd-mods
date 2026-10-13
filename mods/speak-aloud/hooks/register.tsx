@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { Register } from 'claude-code'
+import type { EngineInterface, Register } from 'claude-code'
 
 const KEY = 'speak:enabled'
 const SPEED_KEY = 'speak:speed'
@@ -16,6 +16,32 @@ const INSTRUCTIONS = [
   'Never put code or a full path in it; name a file by its short name instead, such as "the plugin.json file" and not "mods/speak-aloud/.claude-plugin/plugin.json".',
   'Follow it with a blank line, then the rest of the reply as usual.',
 ].join(' ')
+
+// what `say` needs from `$`, as plain functions (a `$` noun is called where it is spelled)
+type Io = {
+  run: (argv: string[], timeoutMs: number, stdin?: string) => Promise<{ exitCode: number; stderr: string }>
+  readWav: () => Promise<string>
+  play: (base64: string) => Promise<void>
+  serve: (dataDir: string) => void
+}
+
+// everything `speak` needs from `$`, built where `$` is in hand; a module-level
+// function, because `$` may only be passed to one
+const envOf = (
+  $: EngineInterface,
+  serve: (spawn: (request: { argv: string[] }) => AsyncIterable<unknown>, dataDir: string) => void,
+) => ({
+  dataDir: (configured: string) => configured || `${$.plugin.root}/voices`,
+  exists: (path: string) => $.fs.exists(path),
+  speed: async () => Number((await $.store.get(SPEED_KEY)) ?? 1),
+  toast: (text: string) => $.ui.toast(text),
+  io: {
+    run: (argv, timeoutMs, stdin) => $.process.run(argv, { timeoutMs, stdin }),
+    readWav: async () => (await $.fs.read(WAV, { as: 'bytes' })).base64,
+    play: base64 => $.audio.play({ base64, mime: 'audio/wav' }),
+    serve: dir => serve(request => $.process.spawn(request), dir),
+  } satisfies Io,
+})
 
 export const register: Register = (on, options) => {
   const voice = String(options.voice ?? 'en_GB-alba-medium')
@@ -46,14 +72,6 @@ export const register: Register = (on, options) => {
       // fall back to the one-shot CLI
     }
     if (mine === generation) isServerStarted = false
-  }
-
-  // what `say` needs from `$`, as plain functions (a `$` noun is called where it is spelled)
-  type Io = {
-    run: (argv: string[], timeoutMs: number, stdin?: string) => Promise<{ exitCode: number; stderr: string }>
-    readWav: () => Promise<string>
-    play: (base64: string) => Promise<void>
-    serve: (dataDir: string) => void
   }
 
   // synthesizes `text` at `speed` and plays it; resolves an error message, or
@@ -197,34 +215,65 @@ export const register: Register = (on, options) => {
     }
   })
 
-  on('turn.complete', async ($, e, next) => {
-    const result = await next(e)
-    if (e.agentId !== undefined || e.reason !== 'answer' || isSpeaking) return result
-    if ((await $.store.get(KEY)) === false) return result
-
-    const text = e.answer.trim().split('\n\n')[0]?.trim()
-    if (!text) return result
-
+  // speaks `text` and toasts a failure; resolves once it has played or failed
+  const speak = async (env: ReturnType<typeof envOf>, text: string) => {
+    if (isSpeaking) return
     isSpeaking = true
     try {
-      const dataDir = configuredDir || `${$.plugin.root}/voices`
-      if (!(await $.fs.exists(`${dataDir}/${voice}.onnx`))) {
-        $.ui.toast(`speak: voice ${voice} not installed; run /speak install`)
-        return result
+      const dataDir = env.dataDir(configuredDir)
+      if (!(await env.exists(`${dataDir}/${voice}.onnx`))) {
+        env.toast(`speak: voice ${voice} not installed; run /speak install`)
+        return
       }
-      const speed = Number((await $.store.get(SPEED_KEY)) ?? 1)
-      const failure = await say(text, speed, dataDir, {
-        run: (argv, timeoutMs, stdin) => $.process.run(argv, { timeoutMs, stdin }),
-        readWav: async () => (await $.fs.read(WAV, { as: 'bytes' })).base64,
-        play: base64 => $.audio.play({ base64, mime: 'audio/wav' }),
-        serve: dir => void serve(request => $.process.spawn(request), dir),
-      })
-      if (failure) $.ui.toast(`speak: ${failure}`)
+      const failure = await say(text, await env.speed(), dataDir, env.io)
+      if (failure) env.toast(`speak: ${failure}`)
     } catch (err) {
-      $.ui.toast(`speak: ${err instanceof Error ? err.message : String(err)}`)
+      env.toast(`speak: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       isSpeaking = false
     }
+  }
+
+  const startServe = (spawn: (request: { argv: string[] }) => AsyncIterable<unknown>, dataDir: string) =>
+    void serve(spawn, dataDir)
+
+  // the turn whose first paragraph `turn.step` already started speaking
+  let spokenTurn: string | undefined
+
+  // starts speaking as soon as the first paragraph has streamed in, while the
+  // rest of the reply is still arriving; every chunk passes on unchanged
+  on('turn.step', async function* ($, e, next) {
+    const stream = next(e)
+    if (e.agentId !== undefined || e.turnId === spokenTurn || (await $.store.get(KEY)) === false) {
+      return yield* stream
+    }
+    let text = ''
+    let blockIndex: number | undefined
+    let speech: Promise<void> | undefined
+    for await (const chunk of stream) {
+      yield chunk
+      if (speech || chunk.kind !== 'text') continue
+      blockIndex ??= chunk.index
+      if (chunk.index !== blockIndex) continue
+      text += chunk.text
+      const end = text.trimStart().indexOf('\n\n')
+      if (end === -1) continue
+      spokenTurn = e.turnId
+      speech = speak(envOf($, startServe), text.trimStart().slice(0, end).trim())
+    }
+    // `$` is only good while this hook runs, so the speech is awaited here
+    await speech
+    return await stream.result
+  })
+
+  // the fallback: a reply with no blank line never spoke from `turn.step`
+  on('turn.complete', async ($, e, next) => {
+    const result = await next(e)
+    if (e.agentId !== undefined || e.reason !== 'answer') return result
+    if (e.turnId === spokenTurn || (await $.store.get(KEY)) === false) return result
+
+    const text = e.answer.trim().split('\n\n')[0]?.trim()
+    if (text) await speak(envOf($, startServe), text)
     return result
   })
 
