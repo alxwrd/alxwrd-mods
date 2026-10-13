@@ -12,7 +12,9 @@ const TEST_LINE = 'The juice of lemons makes fine punch.'
 
 const INSTRUCTIONS = [
   'Read-aloud is on. Begin every reply with a first paragraph that is ONE short, naturally spoken sentence summarising the result or answer, as you would say it to a colleague.',
-  'That paragraph must be plain prose: no markdown, code, file paths, URLs, lists or emoji. Follow it with a blank line, then the rest of the reply as usual.',
+  'That paragraph must be plain prose: no markdown, code, file paths, URLs, lists or emoji.',
+  'Never put code or a full path in it; name a file by its short name instead, such as "the plugin.json file" and not "mods/speak-aloud/.claude-plugin/plugin.json".',
+  'Follow it with a blank line, then the rest of the reply as usual.',
 ].join(' ')
 
 export const register: Register = (on, options) => {

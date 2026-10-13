@@ -39,8 +39,8 @@
     },
     "port": {
       "type": "number",
-      "title": "Server port",
-      "description": "Local port for the Piper HTTP server kept running for fast speech (the default is fine unless something else uses 5123)",
+      "title": "Server port (5123)",
+      "description": "Local port for the Piper HTTP server kept running for fast speech",
       "default": 5123
     }
   },
