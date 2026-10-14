@@ -1,6 +1,6 @@
 {
   "name": "speak-aloud",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Reads the first paragraph of each turn aloud with Piper TTS; toggle with /speak on|off.",
   "userConfig": {
     "voice": {
